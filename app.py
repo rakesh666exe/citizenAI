@@ -1,12 +1,9 @@
-!pip install transformers torch gradio PyPDF2 -q
 
 import gradio as gr
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-import PyPDF2
-import io
 
-# Load model and tokenizer
+# 🧠 Load model and tokenizer
 model_name = "ibm-granite/granite-3.2-2b-instruct"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
@@ -18,9 +15,9 @@ model = AutoModelForCausalLM.from_pretrained(
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
+# ✨ Response generation
 def generate_response(prompt, max_length=1024):
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
-
     if torch.cuda.is_available():
         inputs = {k: v.to(model.device) for k, v in inputs.items()}
 
@@ -37,67 +34,85 @@ def generate_response(prompt, max_length=1024):
     response = response.replace(prompt, "").strip()
     return response
 
-def extract_text_from_pdf(pdf_file):
-    if pdf_file is None:
-        return ""
-
-    try:
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
-        return text
-    except Exception as e:
-        return f"Error reading PDF: {str(e)}"
-
-def eco_tips_generator(problem_keywords):
-    prompt = f"Generate practical and actionable eco-friendly tips for sustainable living related to: {problem_keywords}. Provide specific solutions and suggestions:"
+# 🌆 City analysis feature
+def city_analysis(city_name):
+    prompt = f"""
+    Provide a detailed analysis of {city_name} including:
+    1. Crime Index and safety statistics
+    2. Accident rates and traffic safety information
+    3. Overall safety assessment
+    
+    City: {city_name}
+    Analysis:
+    """
     return generate_response(prompt, max_length=1000)
 
-def policy_summarization(pdf_file, policy_text):
-    # Get text from PDF or direct input
-    if pdf_file is not None:
-        content = extract_text_from_pdf(pdf_file)
-        summary_prompt = f"Summarize the following policy document and extract the most important points, key provisions, and implications:\n\n{content}"
-    else:
-        summary_prompt = f"Summarize the following policy document and extract the most important points, key provisions, and implications:\n\n{policy_text}"
+# 🏛️ Citizen interaction feature
+def citizen_interaction(query):
+    prompt = f"""
+    As a government assistant, provide accurate and helpful information about the following citizen query related to public services, government policies, or civic issues:
 
-    return generate_response(summary_prompt, max_length=1200)
+    Query: {query}
+    Response:
+    """
+    return generate_response(prompt, max_length=1000)
 
-# Create Gradio interface
-with gr.Blocks() as app:
-    gr.Markdown("# Eco Assistant & Policy Analyzer")
 
-    with gr.Tabs():
-        with gr.TabItem("Eco Tips Generator"):
-            with gr.Row():
-                with gr.Column():
-                    keywords_input = gr.Textbox(
-                        label="Environmental Problem/Keywords",
-                        placeholder="e.g., plastic, solar, water waste, energy saving...",
-                        lines=3
-                    )
-                    generate_tips_btn = gr.Button("Generate Eco Tips")
+# 🎨 Gradio UI Design
+custom_css = """
+body {background: linear-gradient(135deg, #1e3c72, #2a5298);}
+.gradio-container {font-family: 'Poppins', sans-serif;}
+h1, h2, h3, h4 {color: white !important; text-align: center;}
+button {font-weight: bold;}
+"""
 
-                with gr.Column():
-                    tips_output = gr.Textbox(label="Sustainable Living Tips", lines=15)
+with gr.Blocks(css=custom_css, theme=gr.themes.Soft()) as app:
+    gr.HTML("<h1>🏙️ Citizen AI — City & Government Intelligence</h1>")
+    gr.Markdown(
+        "### 🤖 Analyze Cities or Ask Government-related Questions\n"
+        "Get real-time AI-powered insights into safety, transport, and civic services."
+    )
 
-            generate_tips_btn.click(eco_tips_generator, inputs=keywords_input, outputs=tips_output)
+    with gr.Tab("🌆 City Analysis"):
+        with gr.Row():
+            with gr.Column(scale=1):
+                city_input = gr.Textbox(
+                    label="Enter City Name 🏙️",
+                    placeholder="e.g., New York, London, Mumbai...",
+                    lines=1
+                )
+                analyze_btn = gr.Button("🔍 Analyze City", variant="primary")
+            with gr.Column(scale=2):
+                city_output = gr.Textbox(
+                    label="City Analysis Report",
+                    lines=15,
+                    show_copy_button=True
+                )
 
-        with gr.TabItem("Policy Summarization"):
-            with gr.Row():
-                with gr.Column():
-                    pdf_upload = gr.File(label="Upload Policy PDF", file_types=[".pdf"])
-                    policy_text_input = gr.Textbox(
-                        label="Or paste policy text here",
-                        placeholder="Paste policy document text...",
-                        lines=5
-                    )
-                    summarize_btn = gr.Button("Summarize Policy")
+        analyze_btn.click(city_analysis, inputs=city_input, outputs=city_output)
 
-                with gr.Column():
-                    summary_output = gr.Textbox(label="Policy Summary & Key Points", lines=20)
+    with gr.Tab("🏛️ Citizen Services"):
+        with gr.Row():
+            with gr.Column(scale=1):
+                citizen_query = gr.Textbox(
+                    label="Your Query 💬",
+                    placeholder="Ask about public services, government policies, or civic issues...",
+                    lines=4
+                )
+                query_btn = gr.Button("📨 Get Information", variant="primary")
+            with gr.Column(scale=2):
+                citizen_output = gr.Textbox(
+                    label="Government Assistant Response",
+                    lines=15,
+                    show_copy_button=True
+                )
 
-            summarize_btn.click(policy_summarization, inputs=[pdf_upload, policy_text_input], outputs=summary_output)
+        query_btn.click(citizen_interaction, inputs=citizen_query, outputs=citizen_output)
+
+    gr.Markdown(
+        "<div style='text-align:center; color:white; font-size:14px; margin-top:20px;'>"
+        "🧠 Powered by IBM Granite & Gradio | Built with ❤️ for Citizen Insights"
+        "</div>"
+    )
 
 app.launch(share=True)
